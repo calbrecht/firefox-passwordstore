@@ -1,0 +1,22 @@
+{
+    "name": "firefox-passwordstore",
+    "title": "firefox-passwordstore",
+    "id": "jid1-6rAQBVWEXFFeTw",
+    "description": "passwordstore.org backend for firefox login manager",
+    "author": "Christian Albrecht",
+    "license": "MPL 2.0",
+    "version": "0.1",
+    "preferences": [{
+        "name": "passCmdPath",
+        "title": "Pass cmd path",
+        "description": "Full path to pass command.",
+        "type": "file",
+        "value": "/usr/bin/pass"
+    }, {
+        "name": "gpgId",
+        "title": "GPG id",
+        "description": "The gpg id to use with pass.",
+        "type": "string",
+        "value": "0A648F6D"
+    }]
+}
