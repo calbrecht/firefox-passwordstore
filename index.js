@@ -10,6 +10,10 @@ var loginInfo = Cc["@mozilla.org/login-manager/loginInfo;1"].createInstance(Ci.n
 
 var contractId = '@github.com/calbrecht/firefox-passwordstore;1';
 
+Cu.import("resource://gre/modules/Services.jsm");
+var prefBranch = Services.prefs.getBranch("signon.");
+prefBranch.setBoolPref("debug", true);
+
 var error = function error(err) {
     console.log(err);
 }
@@ -31,23 +35,53 @@ var mkPath = function mkPath(...args) {
 
 var mapInfo = function mapInfo(value) {
     if ('*' === value) {
-        return null;
+        return '';
     }
     return decodeURIComponent(value);
 };
+
+var mkCloneInfoInit = function mkCloneInfoInit(
+    hostname,
+    formSubmitURL,
+    httpRealm,
+    username,
+    password,
+    usernameField,
+    passwordField
+) {
+    var info = loginInfo.clone();
+    info.init(
+        hostname || '',
+        formSubmitURL || (httpRealm ? null : ''),
+        httpRealm || (formSubmitURL ? null : ''),
+        username || '',
+        '',
+        usernameField || '',
+        passwordField || ''
+    );
+    return info;
+}
 
 var mkInfo = function mkInfo(treeline) {
     var info = null;
     var matches = treeline.match(/\s*-- (.*):(.*):(.*):(.*):(.*):(.*)/);
     if (null !== matches) {
-        info = loginInfo.clone();
         matches.shift();
         //insert empty password at index 4
         matches.splice(4, 0, '*');
-        info.init.apply(info, matches.map(mapInfo));
+        info = mkCloneInfoInit.apply(null, matches.map(mapInfo));
     }
     return info;
 };
+
+var createOutputMapper = function createOutputMapper(mapInto) {
+    return function (data) {
+        Array.prototype.push.apply(
+            mapInto,
+            data.split('\n').map(mkInfo).filter(filterEmpty)
+        );
+    }
+}
 
 var filterEmpty = function (value) {
     return value;
@@ -58,6 +92,7 @@ var PasswordstoreLoginManagerStorage = Class({
     interfaces: [ 'nsILoginManagerStorage' ],
     initialized: false,
     uiBusy: false,
+    _lastFoundInfos: null,
     
     cmd: function cmd(opt, ...args) {
         if (typeof opt === 'string') {
@@ -127,8 +162,8 @@ var PasswordstoreLoginManagerStorage = Class({
     removeLogin: function removeLogin(login) {
         //@TODO
     },
-    modifyLogin: function modifyLogin(oldLogin, newLogin) {
-        //@TODO
+    modifyLogin: function modifyLogin(oldLogin, newLoginData) {
+        console.log('modifyLogin', oldLogin, newLoginData);
     },
     getAllLogins: function getAllLogins(count) {
         //@TODO
@@ -141,50 +176,55 @@ var PasswordstoreLoginManagerStorage = Class({
         count.value = 0;
         return [];
     },
+    _isInLastFoundInfos: function _isInLastFoundInfos(info, hostname) {
+        return this._lastFoundInfos && this._lastFoundInfos.some(
+            function(l) login.matches(l, true)
+        );
+    },
     getLoginSavingEnabled: function getLoginSavingEnabled(hostname) {
-        //@TODO
-        return true;
+        var info = mkCloneInfoInit(hostname);
+        return !this._isInLastFoundInfosHostname(info);
     },
     setLoginSavingEnabled: function setLoginSavingEnabled(hostname, enabled) {
         //@TODO
     },
-    findLogins: function findLogins(count, hostname, formSubmitURL, httpRealm) {
-        var search = mkSearch(
-            hostname,
-            formSubmitURL,
-            httpRealm
-        );
+    searchLogins: function searchLogins(count, matchData) {
         var found = [];
         var opt = {
-            stdout: function (data) {
-                found = found.concat(
-                    data.split('\n').map(mkInfo).filter(filterEmpty)
-                );
-            }
+            stdout: createOutputMapper(found)
         };
+        var search = mkSearch(
+            matchData.hostname,
+            matchData.formSubmitURL,
+            matchData.httpRealm,
+            matchData.username,
+            matchData.usernameField,
+            matchData.passwordField
+        );
         var proc = this.cmd(opt, 'find', search);
-        this.uiBusy = true;
         proc.wait();
-        found.map(this.mapPassword, this);
-        this.uiBusy = false;
         count.value = found.length;
         return found;
     },
-    countLogins: function countLogins(aHostname, aFormSubmitURL, aHttpRealm) {
-        var search = mkSearch(
-            aHostname,
-            aFormSubmitURL,
-            aHttpRealm
-        );
-        var found = [];
-        var proc = this.cmd({
-            stdout: function (data) {
-                found = found.concat(data.split('\n'));
-            }
-        }, 'find', search);
-        proc.wait();
-        //first line is the search term, second is the folder firefox
-        return found.length - 2;
+    _rememberLastFoundInfos: function _rememberLastFoundInfos(infos) {
+        this._lastFoundInfos = [];
+        infos.forEach(function (info) {
+            this._lastFoundInfos.push(info.clone());
+        }, this);
+    },
+    findLogins: function findLogins(count, hostname, formSubmitURL, httpRealm) {
+        var match = mkCloneInfoInit(hostname, formSubmitURL, httpRealm);
+        var found = this.searchLogins(count, match);
+        this.uiBusy = true;
+        this._rememberLastFoundInfos(found);
+        found.map(this.mapPassword, this);
+        this.uiBusy = false;
+        return found;
+    },
+    countLogins: function countLogins(hostname, formSubmitURL, httpRealm) {
+        var match = mkCloneInfoInit(hostname, formSubmitURL, httpRealm);
+        var found = this.searchLogins({}, match);
+        return found.length;
     }
 });
 
