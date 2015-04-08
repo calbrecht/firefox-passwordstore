@@ -176,14 +176,14 @@ var PasswordstoreLoginManagerStorage = Class({
         count.value = 0;
         return [];
     },
-    _isInLastFoundInfos: function _isInLastFoundInfos(info, hostname) {
+    _isInLastFoundInfos: function _isInLastFoundInfos(info) {
         return this._lastFoundInfos && this._lastFoundInfos.some(
-            function(l) login.matches(l, true)
+            function(l) info.matches(l, true)
         );
     },
     getLoginSavingEnabled: function getLoginSavingEnabled(hostname) {
-        var info = mkCloneInfoInit(hostname);
-        return !this._isInLastFoundInfosHostname(info);
+        var info = mkCloneInfoInit(hostname, '');
+        return !this._isInLastFoundInfos(info);
     },
     setLoginSavingEnabled: function setLoginSavingEnabled(hostname, enabled) {
         //@TODO
