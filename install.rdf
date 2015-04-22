@@ -5,7 +5,7 @@
           <em:type>2</em:type>
           <em:bootstrap>false</em:bootstrap>
           <em:unpack>false</em:unpack>
-          <em:version>0.0.1</em:version>
+          <em:version>0.0.2</em:version>
           <em:name>firefox-passwordstore</em:name>
           <em:description>passwordstore.org backend for firefox login manager</em:description>
           <em:creator>Christian Albrecht</em:creator>
